@@ -1,9 +1,11 @@
 {
   "input_dir": "input",
-  "input_pdf": "深圳大学-李卓钊-大数据开发实习生.pdf",
+  "input_pdf": "数据分析实习生.pdf",
   "images_dir": "output/images",
   "merged_pdf_dir": "output/merged_pdfs",
   "dpi": 300,
   "save_images": true,
-  "merge_pdf": true
+  "merge_pdf": true,
+  "append_pdf": "简历第二页.pdf",
+  "append_pdf_enabled": true
 }

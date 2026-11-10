@@ -8,6 +8,7 @@
 - 按页输出 PNG 图片。
 - 可选择是否保留 PNG。
 - 可选择是否生成图片版 PDF。
+- 可选择是否在生成的 PDF 末尾追加指定的另一份 PDF（例如简历第二页）。
 - 每个源 PDF 使用独立的图片和 PDF 输出文件夹。
 - `input/` 和 `output/` 不会提交到 GitHub。
 
@@ -45,7 +46,9 @@ python -m pip install -r requirements.txt
   "merged_pdf_dir": "output/merged_pdfs",
   "dpi": 300,
   "save_images": true,
-  "merge_pdf": true
+  "merge_pdf": true,
+  "append_pdf": "简历第二页.pdf",
+  "append_pdf_enabled": true
 }
 ```
 
@@ -58,6 +61,8 @@ python -m pip install -r requirements.txt
 - `dpi`：渲染清晰度，推荐 200-300。
 - `save_images`：是否永久保存逐页 PNG。
 - `merge_pdf`：是否生成图片版 PDF。
+- `append_pdf`：要追加到生成 PDF 末尾的 PDF 文件名（相对于 `input_dir`，也可以写绝对路径），留空表示不追加。
+- `append_pdf_enabled`：是否追加 `append_pdf` 指定的 PDF，设为 `false` 即可关闭追加。
 
 `save_images` 和 `merge_pdf` 不能同时设置为 `false`。
 
@@ -120,6 +125,7 @@ output/
 
 - DPI 越高，输出越清晰，文件也越大。
 - 图片版 PDF 不保留原文件的书签、链接、表单、附件或可搜索文本层。
+- 追加的 PDF 在 `merge_pdf` 为 `true` 时生效，且会保留原文件自身的文字与矢量内容。
 - 请只处理你有权使用的 PDF 文件。
 
 ## License

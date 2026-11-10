@@ -49,6 +49,23 @@ def pngs_to_pdf(image_paths: list[Path], output_pdf: Path, dpi: int) -> None:
         raise
 
 
+def merge_append_pdf(base_pdf: Path, append_pdf: Path) -> None:
+    """Append every page of append_pdf to the end of base_pdf, in place."""
+    merged = pdfium.PdfDocument.new()
+    base = pdfium.PdfDocument(str(base_pdf))
+    extra = pdfium.PdfDocument(str(append_pdf))
+    try:
+        merged.import_pages(base)
+        merged.import_pages(extra)
+        temp_pdf = base_pdf.with_name(base_pdf.stem + "_tmp.pdf")
+        merged.save(str(temp_pdf))
+    finally:
+        base.close()
+        extra.close()
+        merged.close()
+    temp_pdf.replace(base_pdf)
+
+
 def load_config(config_path: Path) -> dict:
     """Load and validate the JSON configuration."""
     try:
@@ -66,21 +83,44 @@ def load_config(config_path: Path) -> dict:
         "dpi": 300,
         "save_images": True,
         "merge_pdf": True,
+        "append_pdf": "",
+        "append_pdf_enabled": False,
     }
     defaults.update(config)
     if not isinstance(defaults["input_pdf"], str):
         raise ValueError("配置项 input_pdf 必须是字符串")
     if not isinstance(defaults["dpi"], int) or defaults["dpi"] <= 0:
         raise ValueError("配置项 dpi 必须是大于 0 的整数")
-    for key in ("save_images", "merge_pdf"):
+    for key in ("save_images", "merge_pdf", "append_pdf_enabled"):
         if not isinstance(defaults[key], bool):
             raise ValueError(f"配置项 {key} 必须是 true 或 false")
+    if not isinstance(defaults["append_pdf"], str):
+        raise ValueError("配置项 append_pdf 必须是字符串")
     if not defaults["save_images"] and not defaults["merge_pdf"]:
         raise ValueError("save_images 和 merge_pdf 不能同时为 false")
+    if defaults["append_pdf_enabled"] and not defaults["append_pdf"].strip():
+        raise ValueError("append_pdf_enabled 为 true 时必须指定 append_pdf")
     return defaults
 
 
-def convert(pdf_path: Path, config: dict) -> bool:
+def resolve_append_pdf(config: dict) -> Path | None:
+    """Resolve the PDF that gets appended, or None when appending is off."""
+    if not config["append_pdf_enabled"]:
+        return None
+    name = config["append_pdf"].strip()
+    if not name:
+        return None
+    append_pdf = Path(name).expanduser()
+    if not append_pdf.is_absolute():
+        append_pdf = Path(config["input_dir"]) / append_pdf
+    if not append_pdf.is_file():
+        raise ValueError(f"指定的追加 PDF 不存在: {append_pdf}")
+    if append_pdf.suffix.lower() != ".pdf":
+        raise ValueError(f"append_pdf 指定的不是 PDF 文件: {append_pdf}")
+    return append_pdf
+
+
+def convert(pdf_path: Path, config: dict, append_pdf: Path | None = None) -> bool:
     """Convert one PDF according to config."""
     try:
         document = pdfium.PdfDocument(str(pdf_path))
@@ -128,6 +168,9 @@ def convert(pdf_path: Path, config: dict) -> bool:
                 pdf_dir.mkdir(parents=True, exist_ok=True)
                 output_pdf = pdf_dir / f"{pdf_path.stem}_image_{dpi}dpi.pdf"
                 pngs_to_pdf(image_paths, output_pdf, dpi)
+                if append_pdf is not None:
+                    merge_append_pdf(output_pdf, append_pdf)
+                    print(f"[追加] {append_pdf} 已合并到 {output_pdf}")
                 print(f"[PDF]  {output_pdf}")
         finally:
             if temp_context is not None:
@@ -217,9 +260,15 @@ def main() -> int:
             print(f"[输入错误] {exc}", file=sys.stderr)
             return 1
 
+    try:
+        append_pdf = resolve_append_pdf(config)
+    except ValueError as exc:
+        print(f"[配置错误] {exc}", file=sys.stderr)
+        return 2
+
     completed = 0
     for pdf_path in pdf_paths:
-        if convert(pdf_path, config):
+        if convert(pdf_path, config, append_pdf):
             completed += 1
 
     if not completed:
